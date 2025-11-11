@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: tp2_postgres
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: shop
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5.20
+    container_name: tp2_neo4j
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4JLABS_PLUGINS: '["apoc","graph-data-science"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+    ports:
+      - "7474:7474"   # Neo4j Browser (http)
+      - "7687:7687"   # Bolt (driver)
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/import:/import
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    image: python:3.11-slim
+    container_name: tp2_app
+    working_dir: /work
+    command: >
+      bash -c "pip install --no-cache-dir -r /work/app/requirements.txt &&
+               python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: shop
+      DB_USER: app
+      DB_PASSWORD: app
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: password
+    volumes:
+      - ./app:/work/app
+      - ./neo4j/import:/work/import
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+
+        

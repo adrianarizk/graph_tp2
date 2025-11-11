@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Local databases (don’t push)
+neo4j/data/
+neo4j/transactions/
+postgres/data/
+
+# Docker logs
+*.log
+.env
